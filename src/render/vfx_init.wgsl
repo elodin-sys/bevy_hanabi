@@ -159,7 +159,21 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>) {
     // Initialize the PRNG seed
     seed = pcg_hash(particle_index ^ (*spawner).seed);
 
-    // Spawner transform
+    // Spawner transform applied by shape modifiers (cone/sphere/...).
+    // Local-space simulation stores particle attributes in effect space and
+    // applies the emitter transform only at render time. Using the world
+    // spawner matrix here would bake R into positions that render then
+    // multiplies by R again (double rotation) — pitched Local emitters lean
+    // off the geometric axis. Global-space init still needs the world matrix
+    // so shapes land in world before SIMULATION_SPACE_TRANSFORM_PARTICLE.
+#ifdef LOCAL_SPACE_SIMULATION
+    let transform = mat4x4<f32>(
+        vec4<f32>(1.0, 0.0, 0.0, 0.0),
+        vec4<f32>(0.0, 1.0, 0.0, 0.0),
+        vec4<f32>(0.0, 0.0, 1.0, 0.0),
+        vec4<f32>(0.0, 0.0, 0.0, 1.0)
+    );
+#else
     let transform = transpose(
         mat4x4(
             (*spawner).transform[0],
@@ -168,6 +182,7 @@ fn main(@builtin(global_invocation_id) global_invocation_id: vec3<u32>) {
             vec4<f32>(0.0, 0.0, 0.0, 1.0)
         )
     );
+#endif
 
 #ifdef READ_PARENT_PARTICLE
     // Fetch parent particle which triggered this spawn

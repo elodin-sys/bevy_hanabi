@@ -1854,6 +1854,9 @@ bitflags! {
         const ATTRIBUTE_PREV = (1u8 << 1);
         const ATTRIBUTE_NEXT = (1u8 << 2);
         const CONSUME_GPU_SPAWN_EVENTS = (1u8 << 3);
+        /// Key: LOCAL_SPACE_SIMULATION — init shape modifiers must not bake the
+        /// world spawner transform into particle attributes (render applies it).
+        const LOCAL_SPACE_SIMULATION = (1u8 << 4);
     }
 }
 
@@ -1885,7 +1888,7 @@ impl SpecializedComputePipeline for ParticlesInitPipeline {
         let hash = calc_hash(&key);
         trace!("Specializing init pipeline {hash:016X} with key {key:?}");
 
-        let mut shader_defs = Vec::with_capacity(4);
+        let mut shader_defs = Vec::with_capacity(5);
         if key
             .flags
             .contains(ParticleInitPipelineKeyFlags::ATTRIBUTE_PREV)
@@ -1897,6 +1900,12 @@ impl SpecializedComputePipeline for ParticlesInitPipeline {
             .contains(ParticleInitPipelineKeyFlags::ATTRIBUTE_NEXT)
         {
             shader_defs.push("ATTRIBUTE_NEXT".into());
+        }
+        if key
+            .flags
+            .contains(ParticleInitPipelineKeyFlags::LOCAL_SPACE_SIMULATION)
+        {
+            shader_defs.push("LOCAL_SPACE_SIMULATION".into());
         }
         let consume_gpu_spawn_events = key
             .flags
@@ -3975,6 +3984,12 @@ pub fn prepare_init_update_pipelines(
                 flags.set(
                     ParticleInitPipelineKeyFlags::CONSUME_GPU_SPAWN_EVENTS,
                     has_event_buffer,
+                );
+                flags.set(
+                    ParticleInitPipelineKeyFlags::LOCAL_SPACE_SIMULATION,
+                    extracted_effect
+                        .layout_flags
+                        .contains(LayoutFlags::LOCAL_SPACE_SIMULATION),
                 );
                 flags
             };
