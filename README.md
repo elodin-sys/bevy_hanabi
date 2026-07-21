@@ -15,6 +15,12 @@
 
 The Hanabi particle system is a modern GPU-based particle system for the Bevy game engine. It focuses on scale to produce stunning visual effects (VFX) in real time, offloading most of the work to the GPU, with minimal CPU intervention. The design is inspired by modern particle systems found in other industry-leading game engines.
 
+> **elodin-sys fork note (`fix/local-camera-effect-space`):** Local-space
+> `get_camera_position_effect_space` now applies the full inverse affine (not
+> just the 3×3), and `FaceCameraPosition` uses effect-space camera up. Without
+> that, billboards lock toward the world origin when the emitter is far from
+> `(0,0,0)`. Intended for upstream to `djeedai/bevy_hanabi`.
+
 🚧 _This project is under heavy development, and is currently lacking both features and performance / usability polish. However, for moderate-size effects, it can already be used in your project. Feedback and contributions on both design and features are very much welcome._
 
 🎆 Hanabi makes heavy use of compute shaders to offload work to the GPU in a performant way. Support for compute shaders on the `wasm` target (WebAssembly) is available as of v0.13 (Bevy 0.14), and only through WebGPU. See the [WebAssembly support](https://github.com/djeedai/bevy_hanabi/blob/ea57ad23be55a098b9d9446425f1909a8e88f6fc/docs/wasm.md) documentation for details.
