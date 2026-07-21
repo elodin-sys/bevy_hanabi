@@ -57,38 +57,6 @@ fn get_spawner_index() -> u32 {
     return batch_info.spawner_base + effect_location.effect_index;
 }
 
-fn get_camera_position_effect_space() -> vec3<f32> {
-    let view_pos = view.world_from_view[3].xyz;
-#ifdef LOCAL_SPACE_SIMULATION
-    let inverse_transform = transpose(
-        mat3x3(
-            spawners[get_spawner_index()].inverse_transform[0].xyz,
-            spawners[get_spawner_index()].inverse_transform[1].xyz,
-            spawners[get_spawner_index()].inverse_transform[2].xyz,
-        )
-    );
-    return inverse_transform * view_pos;
-#else
-    return view_pos;
-#endif
-}
-
-fn get_camera_rotation_effect_space() -> mat3x3<f32> {
-    let view_rot = mat3x3(view.world_from_view[0].xyz, view.world_from_view[1].xyz, view.world_from_view[2].xyz);
-#ifdef LOCAL_SPACE_SIMULATION
-    let inverse_transform = transpose(
-        mat3x3(
-            spawners[get_spawner_index()].inverse_transform[0].xyz,
-            spawners[get_spawner_index()].inverse_transform[1].xyz,
-            spawners[get_spawner_index()].inverse_transform[2].xyz,
-        )
-    );
-    return inverse_transform * view_rot;
-#else
-    return view_rot;
-#endif
-}
-
 /// Unpack a compressed transform stored in transposed row-major form.
 fn unpack_compressed_transform(compressed_transform: mat3x4<f32>) -> mat4x4<f32> {
     return transpose(
@@ -108,6 +76,37 @@ fn unpack_compressed_transform_3x3_transpose(compressed_transform: mat3x4<f32>) 
         compressed_transform[1].xyz,
         compressed_transform[2].xyz,
     );
+}
+
+fn get_camera_position_effect_space() -> vec3<f32> {
+    let view_pos = view.world_from_view[3].xyz;
+#ifdef LOCAL_SPACE_SIMULATION
+    // Full inverse affine: R^-1 * (cam - T). Using only the 3x3 rotation
+    // (previous) drops emitter translation, so FaceCamera/AlongVelocity
+    // billboards lock toward the world origin once |T| is large.
+    let inverse_transform = unpack_compressed_transform(
+        spawners[get_spawner_index()].inverse_transform
+    );
+    return (inverse_transform * vec4(view_pos, 1.0)).xyz;
+#else
+    return view_pos;
+#endif
+}
+
+fn get_camera_rotation_effect_space() -> mat3x3<f32> {
+    let view_rot = mat3x3(view.world_from_view[0].xyz, view.world_from_view[1].xyz, view.world_from_view[2].xyz);
+#ifdef LOCAL_SPACE_SIMULATION
+    let inverse_transform = transpose(
+        mat3x3(
+            spawners[get_spawner_index()].inverse_transform[0].xyz,
+            spawners[get_spawner_index()].inverse_transform[1].xyz,
+            spawners[get_spawner_index()].inverse_transform[2].xyz,
+        )
+    );
+    return inverse_transform * view_rot;
+#else
+    return view_rot;
+#endif
 }
 
 /// Transform a simulation space position into a world space position.
