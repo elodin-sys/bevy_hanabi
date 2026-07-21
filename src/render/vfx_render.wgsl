@@ -70,14 +70,12 @@ var<private> spawner_index: u32;
 fn get_camera_position_effect_space() -> vec3<f32> {
     let view_pos = view.world_from_view[3].xyz;
 #ifdef LOCAL_SPACE_SIMULATION
-    let inverse_transform = transpose(
-        mat3x3(
-            spawners[spawner_index].inverse_transform[0].xyz,
-            spawners[spawner_index].inverse_transform[1].xyz,
-            spawners[spawner_index].inverse_transform[2].xyz,
-        )
-    );
-    return inverse_transform * view_pos;
+    // The camera position in effect space is the full inverse affine applied to
+    // the world camera position: R^-1 * (cam - T). The 3x3 rotation block alone
+    // ignores the emitter translation T, which makes camera-oriented particles
+    // face a fixed world direction once the emitter is far from the origin.
+    let inverse_transform = unpack_compressed_transform(spawners[spawner_index].inverse_transform);
+    return (inverse_transform * vec4<f32>(view_pos, 1.0)).xyz;
 #else
     return view_pos;
 #endif
@@ -86,6 +84,7 @@ fn get_camera_position_effect_space() -> vec3<f32> {
 fn get_camera_rotation_effect_space() -> mat3x3<f32> {
     let view_rot = mat3x3(view.world_from_view[0].xyz, view.world_from_view[1].xyz, view.world_from_view[2].xyz);
 #ifdef LOCAL_SPACE_SIMULATION
+    // Rotation only, so the 3x3 block is the correct and complete inverse here.
     let inverse_transform = transpose(
         mat3x3(
             spawners[spawner_index].inverse_transform[0].xyz,
