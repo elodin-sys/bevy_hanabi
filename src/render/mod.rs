@@ -8039,6 +8039,75 @@ mod tests {
         assert_eq!(flags, LayoutFlags::NONE);
     }
 
+    /// Unpack a compressed transform the way `unpack_compressed_transform()`
+    /// does in WGSL: the rows are stored transposed.
+    fn unpack_compressed_transform(compressed: &GpuCompressedTransform) -> Mat4 {
+        Mat4::from_cols_array_2d(&[
+            compressed.x_row,
+            compressed.y_row,
+            compressed.z_row,
+            [0., 0., 0., 1.],
+        ])
+        .transpose()
+    }
+
+    /// The render shader converts the camera into effect space with the full
+    /// inverse affine, so the uploaded inverse must carry the translation too.
+    #[test]
+    fn spawner_inverse_transform_is_full_affine() {
+        let transform = GlobalTransform::from(
+            Transform::from_xyz(12.0, -3.0, 10_000.0)
+                .with_rotation(Quat::from_rotation_x(std::f32::consts::FRAC_PI_3)),
+        );
+        let params = GpuSpawnerParams::new(&transform, 0, 0, 0, None, BufferTableId(0), None);
+
+        let inverse = unpack_compressed_transform(&params.inverse_transform);
+
+        // A point at the emitter maps to the effect-space origin. With only the
+        // 3x3 rotation block this would return the rotated world position.
+        let at_emitter = inverse.transform_point3(transform.translation());
+        assert!(
+            at_emitter.abs_diff_eq(Vec3::ZERO, 1e-3),
+            "emitter position should map to the effect-space origin, got {at_emitter:?}"
+        );
+
+        let world_point = Vec3::new(1.0, 2.0, 3.0);
+        let expected = transform.affine().inverse().transform_point3(world_point);
+        let actual = inverse.transform_point3(world_point);
+        assert!(
+            actual.abs_diff_eq(expected, 1e-3),
+            "expected {expected:?}, got {actual:?}"
+        );
+    }
+
+    /// Local- and global-space effects must not share a specialized init
+    /// pipeline: the shader def decides whether shape modifiers receive the
+    /// emitter transform or an identity matrix.
+    #[test]
+    fn init_pipeline_local_space_shader_def() {
+        let shader_defs = |flags: ParticleInitPipelineKeyFlags| {
+            let pipeline = ParticlesInitPipeline::default();
+            let layout_desc = pipeline.sim_params_layout_desc.clone();
+            pipeline
+                .specialize(ParticleInitPipelineKey {
+                    shader: Handle::default(),
+                    particle_layout_min_binding_size: NonZeroU32::new(32).unwrap(),
+                    parent_particle_layout_min_binding_size: None,
+                    flags,
+                    particle_bind_group_layout_desc: layout_desc.clone(),
+                    spawner_bind_group_layout_desc: layout_desc.clone(),
+                    metadata_bind_group_layout_desc: layout_desc,
+                })
+                .shader_defs
+        };
+
+        let local = shader_defs(ParticleInitPipelineKeyFlags::LOCAL_SPACE_SIMULATION);
+        assert!(local.contains(&"LOCAL_SPACE_SIMULATION".into()));
+
+        let global = shader_defs(ParticleInitPipelineKeyFlags::empty());
+        assert!(!global.contains(&"LOCAL_SPACE_SIMULATION".into()));
+    }
+
     #[cfg(feature = "gpu_tests")]
     #[test]
     fn gpu_ops_ifda() {
