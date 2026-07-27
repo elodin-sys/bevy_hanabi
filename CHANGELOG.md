@@ -27,6 +27,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Fixed a bug where some GPU operations queued with a buffer reference could be reused
   after the buffer was reallocated, leading to use-after-free (stale data) on GPU.
+- Fixed `SimulationSpace::Local` effects converting the camera into effect space with only
+  the rotation part of the inverse emitter transform, ignoring its translation. Particles
+  oriented with `OrientMode::FaceCameraPosition` or `OrientMode::AlongVelocity` faced a
+  direction that drifted toward the world origin as the emitter moved away from it, so they
+  stopped tracking the camera and could render edge-on. `OrientMode::FaceCameraPosition` also
+  built its up axis from the world-space view matrix instead of the effect-space camera
+  rotation, adding a roll on rotated emitters.
+- Fixed `SimulationSpace::Local` effects applying the emitter transform twice to shape
+  modifiers: once in the init pass and again when rendering. `SetPositionCone3dModifier`,
+  `SetVelocityCircleModifier`, and `SetVelocityTangentModifier` are affected; a rotated
+  emitter sheared its spawn shape off axis and a scaled one scaled it twice. Note that local
+  space effects on emitters which are rotated, scaled, or far from the origin will render
+  differently than before; this is the intended, corrected behavior.
 
 ## [0.19.0] 2026-06-27
 
