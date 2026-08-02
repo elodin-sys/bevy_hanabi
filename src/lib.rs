@@ -523,7 +523,7 @@ impl SimulationSpace {
                         return Err(ExprError::GraphEvalError(format!("Global-space simulation requires that the particles have a {} attribute.", Attribute::POSITION.name())));
                     }
                     Ok(format!(
-                        "particle.{} += transform[3].xyz;", // TODO: get_view_position()
+                        "particle.{} += sim_from_spawner[3].xyz;", // TODO: get_view_position()
                         Attribute::POSITION.name()
                     ))
                 }
